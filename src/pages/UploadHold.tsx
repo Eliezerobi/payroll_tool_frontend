@@ -78,7 +78,7 @@ export default function UploadHold() {
     <div className="h-full w-full bg-gray-100 p-6 flex flex-col">
       <div className="w-full flex-grow bg-white shadow rounded-lg p-6 flex flex-col">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">Upload Payroll Report</h1>
+          <h1 className="text-2xl font-bold">Upload Transaction With Hold Report</h1>
           <button
             onClick={handleUpload}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"

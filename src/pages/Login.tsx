@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_BASE } from "../config";  // ✅ import the shared constant
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -14,7 +15,7 @@ export default function Login() {
       data.append("username", username);
       data.append("password", password);
 
-      const res = await fetch("http://localhost:8002/api/token", {
+      const res = await fetch(`${API_BASE}/api/token`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: data.toString(),
@@ -24,6 +25,7 @@ export default function Login() {
 
       const { access_token } = (await res.json()) as { access_token: string; token_type: string };
       localStorage.setItem("token", access_token);
+      console.log("Token stored, navigating...")
       navigate("/home", { replace: true });
     } catch (e) {
       setError((e as Error).message || "Login failed");

@@ -1,12 +1,14 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
-import UploadPayroll from "./pages/UploadPayroll";
+import UploadVisits from "./pages/UploadVisits";
 import UploadHold from "./pages/UploadHold";
 import Header from "./components/Header";
 import HistoryPage from "./pages/History"; // 👈 make sure file is `src/pages/History.tsx`
 import UploadPatients from "./pages/UploadPatients";
 import ExportBillableNotes from "./pages/BillingExport";
+import ImportHelloNoteVisits from "./pages/ImportVisits";
+import ImportPatients from "./pages/ImportPatients";
 
 export default function App() {
   const token = localStorage.getItem("token");
@@ -27,8 +29,16 @@ export default function App() {
           element={isLoggedIn ? <Home /> : <Navigate to="/" replace />}
         />
         <Route
-          path="/uploadpayroll"
-          element={isLoggedIn ? <UploadPayroll /> : <Navigate to="/" replace />}
+          path="/uploadvisits"
+          element={isLoggedIn ? <UploadVisits /> : <Navigate to="/" replace />}
+        />
+        <Route
+          path="/importvisits"
+          element={isLoggedIn ? <ImportHelloNoteVisits/> : <Navigate to="/" replace />}
+        />
+        <Route
+          path="/importpatients"
+          element={isLoggedIn ? <ImportPatients /> : <Navigate to="/" replace />}
         />
         <Route
           path="/uploadpatients"

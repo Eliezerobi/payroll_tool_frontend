@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { API_BASE } from "../config";  // ✅ import the shared constant
 
 export default function ExportBillableNotes() {
   const [startDate, setStartDate] = useState<string>("");
@@ -11,7 +12,7 @@ export default function ExportBillableNotes() {
     }
 
     try {
-      const url = `http://localhost:8002/api/billable-notes?start_date=${startDate}&end_date=${endDate}`;
+      const url = `${API_BASE}/api/billable-notes?start_date=${startDate}&end_date=${endDate}`;
       const res = await fetch(url, {
         method: "GET",
         headers: {
