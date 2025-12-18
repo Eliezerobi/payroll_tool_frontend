@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { apiFetch } from "../components/ApiWrapper";
+import { API_BASE } from "../config";
 
 export default function UploadPatients() {
   const [file, setFile] = useState<File | null>(null);
@@ -21,7 +22,7 @@ export default function UploadPatients() {
       formData.append("file", file);
 
       const { res, result } = await apiFetch(
-        "http://localhost:8002/api/patients/upload", // ✅ endpoint for patients
+        `${API_BASE}/api/patients/upload`, // ✅ endpoint for patients
         {
           method: "POST",
           body: formData,
