@@ -70,7 +70,8 @@ export default function Header() {
           </div>
 
           <NavLink to="/history" className={navLinkClass}>History</NavLink>
-          <NavLink to="/billingexport" className={navLinkClass}>Billing Export</NavLink>
+          <NavLink to="/billingfiles" className={navLinkClass}>Billing Files</NavLink>
+          <NavLink to="/billing/calendar" className={navLinkClass}>Billing</NavLink>
         </nav>
 
         <h1 className="text-xl font-bold text-blue-900">Visits</h1>
@@ -103,8 +104,11 @@ export default function Header() {
           <NavLink to="/history" className={navLinkClass} onClick={() => setMenuOpen(false)}>
             History
           </NavLink>
-          <NavLink to="/billingexport" className={navLinkClass} onClick={() => setMenuOpen(false)}>
+          <NavLink to="/billingfiles" className={navLinkClass} onClick={() => setMenuOpen(false)}>
             Billing Export
+          </NavLink>
+          <NavLink to="/billing/calendar" className={navLinkClass} onClick={() => setMenuOpen(false)}>
+            Billing
           </NavLink>
 
         </nav>

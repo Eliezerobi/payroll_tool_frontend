@@ -6,16 +6,21 @@ import UploadHold from "./pages/UploadHold";
 import Header from "./components/Header";
 import HistoryPage from "./pages/History"; // 👈 make sure file is `src/pages/History.tsx`
 import UploadPatients from "./pages/UploadPatients";
-import ExportBillableNotes from "./pages/BillingExport";
+import ExportBillableNotes from "./pages/BillingFiles";
 import ImportHelloNoteVisits from "./pages/ImportVisits";
 import ImportPatients from "./pages/ImportPatients";
+import BillingYearView from "./pages/billing/yearView";
+import BillingMonthView from "./pages/billing/monthView";
+import BillingDayView from "./pages/billing/dayView";
+
 
 export default function App() {
   const token = localStorage.getItem("token");
   const location = useLocation();
 
   const isLoggedIn = Boolean(token);
-  const isLoginPage = location.pathname === "/";
+  const isLoginPage =
+    location.pathname === "/" || location.pathname === "/login";
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 text-gray-900">
@@ -23,40 +28,68 @@ export default function App() {
       {isLoggedIn && !isLoginPage && <Header />}
 
       <Routes>
-        <Route path="/" element={<Login />} />
+        <Route
+          path="/"
+          element={<Navigate to={isLoggedIn ? "/home" : "/login"} replace />}
+        />
+        <Route
+          path="/login"
+          element={isLoggedIn ? <Navigate to="/home" replace /> : <Login />}
+        />
         <Route
           path="/home"
-          element={isLoggedIn ? <Home /> : <Navigate to="/" replace />}
+          element={isLoggedIn ? <Home /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/uploadvisits"
-          element={isLoggedIn ? <UploadVisits /> : <Navigate to="/" replace />}
+          element={isLoggedIn ? <UploadVisits /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/importvisits"
-          element={isLoggedIn ? <ImportHelloNoteVisits/> : <Navigate to="/" replace />}
+          element={isLoggedIn ? <ImportHelloNoteVisits/> : <Navigate to="/login" replace />}
         />
         <Route
           path="/importpatients"
-          element={isLoggedIn ? <ImportPatients /> : <Navigate to="/" replace />}
+          element={isLoggedIn ? <ImportPatients /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/uploadpatients"
-          element={isLoggedIn ? <UploadPatients /> : <Navigate to="/" replace />}
+          element={isLoggedIn ? <UploadPatients /> : <Navigate to="/login" replace />}
         />
         <Route
-          path="/billingexport"
-          element={isLoggedIn ? <ExportBillableNotes /> : <Navigate to="/" replace />}
+          path="/billingfiles"
+          element={isLoggedIn ? <ExportBillableNotes /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/uploadhold"
-          element={isLoggedIn ? <UploadHold /> : <Navigate to="/" replace />}
+          element={isLoggedIn ? <UploadHold /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/history"
-          element={isLoggedIn ? <HistoryPage /> : <Navigate to="/" replace />}
+          element={isLoggedIn ? <HistoryPage /> : <Navigate to="/login" replace />}
         />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route
+          path="/billing/calendar"
+          element={isLoggedIn ? <BillingYearView /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/billing/calendar/:year"
+          element={isLoggedIn ? <BillingYearView /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/billing/calendar/:year/:month"
+          element={isLoggedIn ? <BillingMonthView /> : <Navigate to="/login" replace />}
+        />
+
+        <Route
+          path="/billing/calendar/:year/:month/:day"
+          element={isLoggedIn ? <BillingDayView /> : <Navigate to="/login" replace />}
+        />
+
+        <Route
+          path="*"
+          element={<Navigate to={isLoggedIn ? "/home" : "/login"} replace />}
+        />
       </Routes>
     </div>
   );

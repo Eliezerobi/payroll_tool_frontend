@@ -3,7 +3,8 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 interface Visit {
   id: number;
-  visit_uid:string;
+  note_id: number | null; // ✅ ADD
+  visit_uid: string;
   patient_id: number;
   first_name: string;
   last_name: string;
@@ -12,7 +13,7 @@ interface Visit {
   visit_type: string | null;
   case_description: string | null;
   note_number: number;
-  supervising_therapist: string|null;
+  supervising_therapist: string | null;
   visiting_therapist: string;
 }
 
@@ -27,7 +28,6 @@ export default function HistoryPage() {
   const [sortColumn, setSortColumn] = useState<SortColumn>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
-
   const fetchHistory = async () => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -37,13 +37,12 @@ export default function HistoryPage() {
 
     const res = await fetch(`${API_BASE}/payroll/history?${params.toString()}`, {
       headers: {
-        "Authorization": `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
     });
 
     if (res.status === 401) {
-      // login expired → bounce back to login
       window.location.href = "/login";
       return;
     }
@@ -85,7 +84,7 @@ export default function HistoryPage() {
       <div className="flex gap-4">
         <input
           type="text"
-          placeholder="Search by Patient ID, Name, or Case"
+          placeholder="Search by Patient ID, Name, or Note ID" // ✅ optional update
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => {
@@ -108,6 +107,7 @@ export default function HistoryPage() {
           <tr>
             {[
               ["id", "ID"],
+              ["note_id", "Note ID"], // ✅ ADD
               ["visit_uid", "Visit Unique ID"],
               ["patient_id", "Patient ID"],
               ["last_name", "Last Name"],
@@ -137,6 +137,7 @@ export default function HistoryPage() {
           {sortedVisits.map((v) => (
             <tr key={v.id}>
               <td className="border px-2 py-1">{v.id}</td>
+              <td className="border px-2 py-1">{v.note_id ?? ""}</td> {/* ✅ ADD */}
               <td className="border px-2 py-1">{v.visit_uid}</td>
               <td className="border px-2 py-1">{v.patient_id}</td>
               <td className="border px-2 py-1">{v.last_name}</td>
