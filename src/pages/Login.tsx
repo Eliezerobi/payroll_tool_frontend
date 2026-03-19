@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { API_BASE } from "../config";
 
 export default function Login() {
@@ -97,6 +97,13 @@ export default function Login() {
         </form>
 
         {error && <p className="mt-4 text-center text-sm text-red-600">{error}</p>}
+
+        <p className="mt-6 text-center text-sm text-slate-600">
+          Need an account?{" "}
+          <Link to="/register" className="font-medium text-slate-900 hover:underline">
+            Register with OTP
+          </Link>
+        </p>
       </div>
     </div>
   );
