@@ -1,11 +1,23 @@
-import { ExportBillableNotes, ImportBilledNotes, ImportMetDeductible } from "@/pages/billingFiles";
+import {
+  ExportBillableNotes,
+  ImportBilledNotes,
+  ImportMetDeductible,
+  UploadMillinInvoices,
+  BillingFileExport,
+} from "@/pages/billingFiles";
 
-export default function BillingFilesPage() {
+const BillingFiles = () => {
   return (
-    <div className="h-full w-full bg-gray-100 p-6 flex flex-col gap-6">
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 p-6">
+      <BillingFileExport />
       <ExportBillableNotes />
       <ImportBilledNotes />
       <ImportMetDeductible />
+      <div className="xl:col-span-2">
+        <UploadMillinInvoices />
+      </div>
     </div>
   );
-}
+};
+
+export default BillingFiles;

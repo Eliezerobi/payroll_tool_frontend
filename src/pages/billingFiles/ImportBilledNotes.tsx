@@ -18,11 +18,15 @@ export default function ImportBilledNotes() {
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadResult, setUploadResult] = useState<ImportResult | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  // If you want token to always be current, do NOT memoize:
-  // const token = localStorage.getItem("token") || "";
-  // But memoize is fine if your token doesn’t change while this page is open.
   const token = useMemo(() => localStorage.getItem("token") || "", []);
+
+  const handleFileSelect = (file: File | null) => {
+    setBilledFile(file);
+    setUploadError(null);
+    setUploadResult(null);
+  };
 
   const handleUploadAlreadyBilled = async () => {
     setUploadError(null);
@@ -55,13 +59,13 @@ export default function ImportBilledNotes() {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
-          // Do not set Content-Type for FormData
         },
         body: formData,
       });
 
       const text = await res.text();
       let data: any = null;
+
       try {
         data = JSON.parse(text);
       } catch {
@@ -82,6 +86,22 @@ export default function ImportBilledNotes() {
     }
   };
 
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const droppedFile = e.dataTransfer.files?.[0] || null;
+    handleFileSelect(droppedFile);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
   return (
     <div className="w-full bg-white shadow rounded-lg p-6 flex flex-col">
       <h2 className="text-xl font-bold mb-2">Import Already Billed Notes</h2>
@@ -91,15 +111,44 @@ export default function ImportBilledNotes() {
         corresponding <span className="font-mono">billing_status</span> rows.
       </p>
 
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-4">
+        <div
+          className={`w-full p-6 rounded-lg text-center cursor-pointer transition border-dashed border-2 flex flex-col items-center justify-center min-h-[220px]
+            ${isDragging ? "bg-gray-300 border-gray-500" : "bg-gray-200 border-gray-300"} text-gray-800 font-medium`}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onClick={() => document.getElementById("billedNotesFileUpload")?.click()}
+        >
+          <p className="text-lg">Click or drag file here to upload</p>
+
           <input
             type="file"
+            id="billedNotesFileUpload"
             accept=".xlsx,.xls"
-            onChange={(e) => setBilledFile(e.target.files?.[0] || null)}
-            className="block"
+            onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
+            className="hidden"
           />
 
+          {billedFile && (
+            <div className="mt-4 flex items-center gap-2 text-green-700">
+              <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                <svg
+                  className="w-4 h-4 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={3}
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <span className="text-sm font-medium">{billedFile.name}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4">
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -112,17 +161,11 @@ export default function ImportBilledNotes() {
           <button
             onClick={handleUploadAlreadyBilled}
             disabled={uploading}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60"
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {uploading ? "Uploading..." : "Upload"}
           </button>
         </div>
-
-        {billedFile && (
-          <div className="text-sm text-gray-700">
-            Selected: <span className="font-mono">{billedFile.name}</span>
-          </div>
-        )}
 
         {uploadError && (
           <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3">
@@ -133,6 +176,7 @@ export default function ImportBilledNotes() {
         {uploadResult && (
           <div className="text-sm bg-gray-50 border border-gray-200 rounded p-3">
             <div className="font-semibold mb-2">Import Result</div>
+
             <div className="grid grid-cols-2 gap-2">
               <div>Processed</div>
               <div className="font-mono">{uploadResult.processed}</div>

@@ -12,8 +12,15 @@ export default function ImportMetDeductible() {
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadResult, setUploadResult] = useState<ImportMetDeductibleResult | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const token = useMemo(() => localStorage.getItem("token") || "", []);
+
+  const handleFileSelect = (selectedFile: File | null) => {
+    setFile(selectedFile);
+    setUploadError(null);
+    setUploadResult(null);
+  };
 
   const handleUpload = async () => {
     setUploadError(null);
@@ -25,7 +32,8 @@ export default function ImportMetDeductible() {
     }
 
     const isExcel =
-      file.name.toLowerCase().endsWith(".xlsx") || file.name.toLowerCase().endsWith(".xls");
+      file.name.toLowerCase().endsWith(".xlsx") ||
+      file.name.toLowerCase().endsWith(".xls");
 
     if (!isExcel) {
       setUploadError("File must be an Excel file (.xlsx or .xls).");
@@ -37,21 +45,19 @@ export default function ImportMetDeductible() {
       const formData = new FormData();
       formData.append("file", file);
 
-      // If your API is under /api, use:
-      // const url = `${API_BASE}/api/patients/import-deductible-flags`;
       const url = `${API_BASE}/api/patients/import-deductible-flags`;
 
       const res = await fetch(url, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
-          // do NOT set Content-Type for FormData
         },
         body: formData,
       });
 
       const text = await res.text();
       let data: any = null;
+
       try {
         data = JSON.parse(text);
       } catch {
@@ -72,6 +78,22 @@ export default function ImportMetDeductible() {
     }
   };
 
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const droppedFile = e.dataTransfer.files?.[0] || null;
+    handleFileSelect(droppedFile);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
   return (
     <div className="w-full bg-white shadow rounded-lg p-6 flex flex-col">
       <h2 className="text-xl font-bold mb-2">Import Met Deductible Flags</h2>
@@ -87,29 +109,56 @@ export default function ImportMetDeductible() {
         <span className="font-mono">patients.met_deductible = true</span>.
       </p>
 
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-4">
+        <div
+          className={`w-full p-6 rounded-lg text-center cursor-pointer transition border-dashed border-2 flex flex-col items-center justify-center min-h-[220px]
+            ${isDragging ? "bg-gray-300 border-gray-500" : "bg-gray-200 border-gray-300"} text-gray-800 font-medium`}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onClick={() => document.getElementById("metDeductibleFileUpload")?.click()}
+        >
+          <p className="text-lg">Click or drag file here to upload</p>
+
           <input
             type="file"
+            id="metDeductibleFileUpload"
             accept=".xlsx,.xls"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-            className="block"
+            onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
+            className="hidden"
           />
 
+          {file && (
+            <div className="mt-4 flex items-center gap-2 text-green-700">
+              <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                <svg
+                  className="w-4 h-4 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={3}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+              <span className="text-sm font-medium">{file.name}</span>
+            </div>
+          )}
+        </div>
+
+        <div>
           <button
             onClick={handleUpload}
             disabled={uploading}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60"
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {uploading ? "Uploading..." : "Upload"}
           </button>
         </div>
-
-        {file && (
-          <div className="text-sm text-gray-700">
-            Selected: <span className="font-mono">{file.name}</span>
-          </div>
-        )}
 
         {uploadError && (
           <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3">

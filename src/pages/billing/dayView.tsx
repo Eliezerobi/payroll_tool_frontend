@@ -445,6 +445,9 @@ export default function BillingDayView() {
 
   const [viewMode, setViewMode] = useState<"billing" | "reconcile">("billing");
   const [activeBucket, setActiveBucket] = useState<string | null>(null);
+  const [insuranceFilter, setInsuranceFilter] = useState<string>(""
+  );
+  const [sortBy, setSortBy] = useState<"first" | "last">("first");
 
   // paging per bucket (only relevant when showing ALL cards)
   const [pageByBucket, setPageByBucket] = useState<Record<string, number>>({});
@@ -560,29 +563,59 @@ export default function BillingDayView() {
   // -----------------------------
   // Bucketed + sorted visits
   // -----------------------------
+  const filteredAndSortedVisits = useMemo(() => {
+    // apply insurance filter
+    let arr = visits.slice();
+    if (insuranceFilter && insuranceFilter.trim()) {
+      const f = insuranceFilter.trim().toLowerCase();
+      arr = arr.filter((v) => (v.primary_insurance || "").toLowerCase().includes(f));
+    }
+
+    // sorting helper: by full name (first or last)
+    const getLastName = (name: string) => {
+      if (!name) return "";
+      // if format is "Last, First" use part before comma
+      if (name.includes(",")) return name.split(",")[0].trim();
+      const parts = name.trim().split(/\s+/);
+      return parts.length > 1 ? parts.slice(1).join(" ") : parts[0];
+    };
+
+    arr.sort((a, b) => {
+      const an = (a.full_name || "").toLowerCase();
+      const bn = (b.full_name || "").toLowerCase();
+      if (sortBy === "first") return an.localeCompare(bn);
+      const al = getLastName(a.full_name || "").toLowerCase();
+      const bl = getLastName(b.full_name || "").toLowerCase();
+      return al.localeCompare(bl) || an.localeCompare(bn);
+    });
+
+    return arr;
+  }, [visits, insuranceFilter, sortBy]);
+
   const visitsByBillingBucket = useMemo(() => {
     const map = new Map<string, VisitRow[]>();
     for (const b of billingBucketsDef) map.set(b.key, []);
 
-    for (const v of visits) {
+    for (const v of filteredAndSortedVisits) {
       const key = v.billingBucketKey;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(v);
     }
 
+    // keep visit_uid secondary sort
     for (const [k, arr] of map.entries()) {
       arr.sort((a, b) => compareVisitUid(a.visit_uid, b.visit_uid));
       map.set(k, arr);
     }
 
     return map;
-  }, [visits, billingBucketsDef]);
+  }, [filteredAndSortedVisits, billingBucketsDef]);
 
   const visitsByReconcileBucket = useMemo(() => {
     const map = new Map<string, VisitRow[]>();
     for (const b of reconcileBucketsDef) map.set(b.key, []);
 
-    for (const v of visits) {
+    for (const v of filteredAndSortedVisits) {
       const key = v.reconcileBucketKey;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(v);
@@ -594,7 +627,7 @@ export default function BillingDayView() {
     }
 
     return map;
-  }, [visits, reconcileBucketsDef]);
+  }, [filteredAndSortedVisits, reconcileBucketsDef]);
 
   // -----------------------------
   // Pill segments
@@ -867,6 +900,84 @@ export default function BillingDayView() {
                 <span className="font-semibold">{activeTitle}</span>
               </div>
             )}
+          </div>
+
+          {/* Filter / Sort / Export controls */}
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <div>
+              <label className="block text-xs text-slate-500">Filter by Insurance</label>
+              <select
+                value={insuranceFilter}
+                onChange={(e) => setInsuranceFilter(e.target.value)}
+                className="border rounded px-2 py-1 text-sm"
+              >
+                <option value="">All insurances</option>
+                {Array.from(new Set(visits.map((v) => v.primary_insurance || "").filter(Boolean))).map((ins) => (
+                  <option key={ins} value={ins}>{ins}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-500">Sort by</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as "first" | "last")}
+                className="border rounded px-2 py-1 text-sm"
+              >
+                <option value="first">First name</option>
+                <option value="last">Last name</option>
+              </select>
+            </div>
+
+            <div className="self-end">
+              <button
+                type="button"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:border-slate-300"
+                onClick={() => {
+                  // export currently visible rows: activeBucket if set, otherwise filteredAndSortedVisits
+                  let rowsToExport: VisitRow[] = [];
+                  if (activeBucket) {
+                    if (viewMode === "billing") rowsToExport = visitsByBillingBucket.get(activeBucket) ?? [];
+                    else rowsToExport = visitsByReconcileBucket.get(activeBucket) ?? [];
+                  } else {
+                    rowsToExport = filteredAndSortedVisits;
+                  }
+
+                  // build CSV
+                  const headers = ["Full Name", "Visit UID", "Therapist", "Primary Insurance", "DOS"];
+                  const esc = (s: any) => {
+                    if (s === null || s === undefined) return "";
+                    const str = String(s);
+                    if (str.includes(",") || str.includes("\n") || str.includes('"')) {
+                      return '"' + str.replace(/"/g, '""') + '"';
+                    }
+                    return str;
+                  };
+                  const lines = [headers.join(",")];
+                  for (const r of rowsToExport) {
+                    lines.push([
+                      esc(r.full_name),
+                      esc(r.visit_uid),
+                      esc(r.therapist),
+                      esc(r.primary_insurance),
+                      esc(r.dos),
+                    ].join(","));
+                  }
+                  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `visits_export_${dateISO}.csv`;
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  window.URL.revokeObjectURL(url);
+                }}
+              >
+                Export
+              </button>
+            </div>
           </div>
 
           {/* BUCKET CARDS GRID */}

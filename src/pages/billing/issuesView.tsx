@@ -10,12 +10,19 @@ type UnpreparedVisit = {
   patient_id: number;
   case_id: number | null;
   case_description: string;
+  primary_ins_id: string;
   full_name: string;
   visiting_therapist: string;
   primary_insurance: string;
+  secondary_ins_id: string;
   secondary_insurance: string;
+  ref_provider_npi: string;
+  referring_provider: string;
   diagnosis: string;
   medical_diagnosis: string;
+  cpt_code: string;
+  auth_number: string;
+  rendering_provider_npi: string;
   visit_uid: string;
   issue_keys: string[];
   issue_labels: string[];
@@ -28,6 +35,11 @@ type UnpreparedResponse = {
   offset: number;
   issue_labels?: Record<string, string>;
   visits: UnpreparedVisit[];
+};
+
+type InsuranceOptions = {
+  primary_insurance: string[];
+  secondary_insurance: string[];
 };
 
 const FETCH_BATCH = 500;
@@ -50,6 +62,21 @@ const FALLBACK_ISSUE_LABELS: Record<string, string> = {
 
 type IssueKey = "all" | (typeof ISSUE_ORDER)[number];
 type DateSort = "desc" | "asc";
+type BulkEditField =
+  | "primary_insurance"
+  | "secondary_insurance"
+  | "primary_ins_id"
+  | "secondary_ins_id"
+  | "ref_provider_npi"
+  | "referring_provider"
+  | "diagnosis"
+  | "visiting_therapist"
+  | "cpt_code"
+  | "auth_number"
+  | "medical_diagnosis"
+  | "rendering_provider_npi";
+
+type BulkEditForm = Record<BulkEditField, string>;
 
 type DrawerVisit = {
   id: number;
@@ -76,6 +103,28 @@ export default function BillingIssuesView() {
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedVisit, setSelectedVisit] = useState<DrawerVisit | null>(null);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkEditSaving, setBulkEditSaving] = useState(false);
+  const [bulkEditError, setBulkEditError] = useState<string | null>(null);
+  const [bulkEditPatientKey, setBulkEditPatientKey] = useState<string | null>(null);
+  const [insuranceOptions, setInsuranceOptions] = useState<InsuranceOptions>({
+    primary_insurance: [],
+    secondary_insurance: [],
+  });
+  const [bulkEditForm, setBulkEditForm] = useState<BulkEditForm>({
+    primary_insurance: "",
+    secondary_insurance: "",
+    primary_ins_id: "",
+    secondary_ins_id: "",
+    ref_provider_npi: "",
+    referring_provider: "",
+    diagnosis: "",
+    visiting_therapist: "",
+    cpt_code: "",
+    auth_number: "",
+    medical_diagnosis: "",
+    rendering_provider_npi: "",
+  });
 
   const openVisitDrawer = (v: UnpreparedVisit) => {
     setSelectedVisit({
@@ -97,6 +146,31 @@ export default function BillingIssuesView() {
 
   const closeVisitDrawer = () => {
     setDrawerOpen(false);
+  };
+
+  const openBulkEdit = (patientKey: string) => {
+    setBulkEditPatientKey(patientKey);
+    setBulkEditError(null);
+    setBulkEditForm({
+      primary_insurance: "",
+      secondary_insurance: "",
+      primary_ins_id: "",
+      secondary_ins_id: "",
+      ref_provider_npi: "",
+      referring_provider: "",
+      diagnosis: "",
+      visiting_therapist: "",
+      cpt_code: "",
+      auth_number: "",
+      medical_diagnosis: "",
+      rendering_provider_npi: "",
+    });
+    setBulkEditOpen(true);
+  };
+
+  const closeBulkEdit = () => {
+    setBulkEditOpen(false);
+    setBulkEditPatientKey(null);
   };
 
   useEffect(() => {
@@ -168,6 +242,33 @@ export default function BillingIssuesView() {
     };
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/visits/insurance-options`, {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as InsuranceOptions;
+        if (!alive) return;
+        setInsuranceOptions({
+          primary_insurance: data.primary_insurance ?? [],
+          secondary_insurance: data.secondary_insurance ?? [],
+        });
+      } catch {
+        // keep page functional without blocking bulk edit
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const issueCounts = useMemo(() => {
     const counts: Record<string, number> = {
       all: visits.length,
@@ -190,13 +291,13 @@ export default function BillingIssuesView() {
   }, [activeIssue, visits]);
 
   const groupedByPatient = useMemo(() => {
-    const map = new Map<string, { patientLabel: string; patientId: number | null; rows: UnpreparedVisit[] }>();
+    const map = new Map<string, { patientKey: string; patientLabel: string; patientId: number | null; rows: UnpreparedVisit[] }>();
     for (const v of filteredVisits) {
       const patientId = v.patient_id ?? "unknown";
       const patientName = (v.full_name || "").trim() || `Patient ${patientId}`;
       const key = `${patientId}|${patientName}`;
       if (!map.has(key)) {
-        map.set(key, { patientLabel: patientName, patientId: v.patient_id ?? null, rows: [] });
+        map.set(key, { patientKey: key, patientLabel: patientName, patientId: v.patient_id ?? null, rows: [] });
       }
       map.get(key)!.rows.push(v);
     }
@@ -230,6 +331,97 @@ export default function BillingIssuesView() {
     }
     return groups;
   }, [filteredVisits, dateSort]);
+
+  const selectedBulkGroup = useMemo(
+    () => groupedByPatient.find((g) => g.patientKey === bulkEditPatientKey) ?? null,
+    [groupedByPatient, bulkEditPatientKey]
+  );
+
+  const bulkPlaceholders = useMemo(() => {
+    const out: Record<BulkEditField, string> = {
+      primary_insurance: "",
+      secondary_insurance: "",
+      primary_ins_id: "",
+      secondary_ins_id: "",
+      ref_provider_npi: "",
+      referring_provider: "",
+      diagnosis: "",
+      visiting_therapist: "",
+      cpt_code: "",
+      auth_number: "",
+      medical_diagnosis: "",
+      rendering_provider_npi: "",
+    };
+    if (!selectedBulkGroup) return out;
+
+    const keys = Object.keys(out) as BulkEditField[];
+    for (const key of keys) {
+      const distinct = new Set<string>();
+      for (const row of selectedBulkGroup.rows) {
+        const val = String((row as any)[key] ?? "").trim();
+        if (val) distinct.add(val);
+      }
+      if (distinct.size === 1) out[key] = Array.from(distinct)[0];
+      else if (distinct.size > 1) out[key] = "many";
+      else out[key] = "";
+    }
+    return out;
+  }, [selectedBulkGroup]);
+
+  async function submitBulkEdit() {
+    if (!selectedBulkGroup) return;
+    setBulkEditSaving(true);
+    setBulkEditError(null);
+    try {
+      const token = localStorage.getItem("token");
+      const updates: Partial<BulkEditForm> = {};
+      for (const [k, v] of Object.entries(bulkEditForm)) {
+        if ((v ?? "").trim() !== "") {
+          updates[k as BulkEditField] = v;
+        }
+      }
+      if (Object.keys(updates).length === 0) {
+        throw new Error("Enter at least one field to update.");
+      }
+
+      const noteIds = Array.from(
+        new Set(selectedBulkGroup.rows.map((r) => r.note_id).filter((n): n is number => Boolean(n)))
+      );
+      if (!noteIds.length) {
+        throw new Error("No note IDs found for this patient group.");
+      }
+
+      const res = await fetch(`${API_BASE}/api/visits/bulk-update`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          note_ids: noteIds,
+          updates,
+        }),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Bulk update failed (${res.status})${txt ? ` - ${txt}` : ""}`);
+      }
+
+      const updatedRows = selectedBulkGroup.rows.map((row) => ({
+        ...row,
+        ...updates,
+      }));
+      const updatedById = new Map(updatedRows.map((r) => [r.id, r]));
+      setVisits((prev) => prev.map((v) => updatedById.get(v.id) ?? v));
+
+      closeBulkEdit();
+    } catch (e) {
+      setBulkEditError((e as Error).message || "Failed bulk update");
+    } finally {
+      setBulkEditSaving(false);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-7xl p-6">
@@ -318,23 +510,32 @@ export default function BillingIssuesView() {
         <div className="space-y-4">
           {groupedByPatient.map((group) => (
             <div
-              key={group.patientLabel}
+              key={group.patientKey}
               className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
             >
               <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="text-sm font-semibold text-slate-900">
-                  {group.patientId ? (
-                    <a
-                      href={`https://emr.appv2.hellonote.com/app/main/patients/${group.patientId}/information`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-700 underline hover:text-blue-900"
-                    >
-                      {group.patientLabel}
-                    </a>
-                  ) : (
-                    group.patientLabel
-                  )}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-slate-900">
+                    {group.patientId ? (
+                      <a
+                        href={`https://emr.appv2.hellonote.com/app/main/patients/${group.patientId}/information`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-700 underline hover:text-blue-900"
+                      >
+                        {group.patientLabel}
+                      </a>
+                    ) : (
+                      group.patientLabel
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 hover:border-slate-400"
+                    onClick={() => openBulkEdit(group.patientKey)}
+                  >
+                    Bulk Edit Patient
+                  </button>
                 </div>
                 <div className="text-xs text-slate-600">
                   {group.rows.length} problematic note{group.rows.length === 1 ? "" : "s"}
@@ -404,6 +605,107 @@ export default function BillingIssuesView() {
       )}
 
       <VisitDetailsDrawer open={drawerOpen} onClose={closeVisitDrawer} visit={selectedVisit} />
+
+      {bulkEditOpen && selectedBulkGroup && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/30" onClick={closeBulkEdit} aria-hidden="true" />
+          <div className="absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl">
+            <div className="flex h-full flex-col">
+              <div className="flex items-start justify-between border-b border-slate-200 p-4">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">Bulk Edit Patient Issues</div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {selectedBulkGroup.patientLabel} • {selectedBulkGroup.rows.length} notes
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeBulkEdit}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm hover:border-slate-300"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-auto p-4">
+                {bulkEditError && (
+                  <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    {bulkEditError}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  {(Object.keys(bulkEditForm) as BulkEditField[]).map((key) => (
+                    <div key={key} className="rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="mb-1 text-[11px] font-medium text-slate-500">
+                        {key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                      </div>
+                      {key === "primary_insurance" ? (
+                        <>
+                          <input
+                            type="text"
+                            list="bulk-primary-insurance-options"
+                            className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                            value={bulkEditForm[key]}
+                            onChange={(e) =>
+                              setBulkEditForm((prev) => ({ ...prev, [key]: e.target.value }))
+                            }
+                            placeholder={bulkPlaceholders[key] || "Leave blank to keep unchanged"}
+                          />
+                          <datalist id="bulk-primary-insurance-options">
+                            {insuranceOptions.primary_insurance.map((opt) => (
+                              <option key={opt} value={opt} />
+                            ))}
+                          </datalist>
+                        </>
+                      ) : key === "secondary_insurance" ? (
+                        <>
+                          <input
+                            type="text"
+                            list="bulk-secondary-insurance-options"
+                            className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                            value={bulkEditForm[key]}
+                            onChange={(e) =>
+                              setBulkEditForm((prev) => ({ ...prev, [key]: e.target.value }))
+                            }
+                            placeholder={bulkPlaceholders[key] || "Leave blank to keep unchanged"}
+                          />
+                          <datalist id="bulk-secondary-insurance-options">
+                            {insuranceOptions.secondary_insurance.map((opt) => (
+                              <option key={opt} value={opt} />
+                            ))}
+                          </datalist>
+                        </>
+                      ) : (
+                        <input
+                          type="text"
+                          className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                          value={bulkEditForm[key]}
+                          onChange={(e) =>
+                            setBulkEditForm((prev) => ({ ...prev, [key]: e.target.value }))
+                          }
+                          placeholder={bulkPlaceholders[key] || "Leave blank to keep unchanged"}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-t border-slate-200 p-4">
+                <button
+                  type="button"
+                  onClick={submitBulkEdit}
+                  disabled={bulkEditSaving}
+                  className="w-full rounded-lg bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                >
+                  {bulkEditSaving ? "Saving..." : "Submit Bulk Update"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
